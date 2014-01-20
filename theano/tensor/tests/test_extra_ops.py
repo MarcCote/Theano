@@ -5,17 +5,90 @@ import unittest
 import theano
 from theano.tests import unittest_tools as utt
 
-from theano.tensor.extra_ops import (CumsumOp, cumsum, CumprodOp, cumprod,
-                                     BinCountOp, bincount, DiffOp, diff,
-                                     squeeze, RepeatOp, repeat, Bartlett, bartlett,
-                                     FillDiagonal, fill_diagonal, FillDiagonalOffset,
-                                     fill_diagonal_offset)
+from theano.tensor.extra_ops import (SearchsortedOp, searchsorted,
+                                     CumsumOp, cumsum,
+                                     CumprodOp, cumprod,
+                                     BinCountOp, bincount,
+                                     DiffOp, diff,
+                                     RepeatOp, repeat,
+                                     Bartlett, bartlett,
+                                     FillDiagonal, fill_diagonal,
+                                     squeeze)
 from theano import tensor as T
 from theano import config, tensor, function
 
 
 numpy_ver = [int(n) for n in numpy.__version__.split('.')[:2]]
 numpy_16 = bool(numpy_ver >= [1, 6])
+
+class TestSearchsortedOp(utt.InferShapeTester):
+
+    def setUp(self):
+        super(TestSearchsortedOp, self).setUp()
+        self.op_class = SearchsortedOp
+        self.op = SearchsortedOp()
+
+    def test_searchsorteOp(self):
+        x = T.vector('x')
+        v = T.tensor3('v')
+
+        a = np.random.random(100).astype(config.floatX)
+        b = np.random.random((10,20,5)).astype(config.floatX)
+        idx_sorted = np.argsort(a)
+
+        # Test using default parameters' value
+        f = theano.function([x, v], searchsorted(x, v))
+        assert np.allclose(np.searchsorted(a[idx_sorted], b), f(a[idx_sorted], b))
+
+        # Test parameter ``sorter``
+        sorter = T.vector('sorter', dtype="float32")  # Non-integer should raise exception on compilation.
+        self.assertRaises(TypeError, searchsorted, x, v, sorter=sorter)
+
+        sorter = T.vector('sorter', dtype="int64")
+        f = theano.function([x, v, sorter], searchsorted(x, v, sorter=sorter))
+        assert np.allclose(np.searchsorted(a, b, sorter=idx_sorted), f(a, b, idx_sorted))
+
+        # Test parameter ``side``
+        a = np.ones(10).astype(config.floatX)
+        b = np.ones(shape=(1,2,3)).astype(config.floatX)
+        f = theano.function([x, v], searchsorted(x, v, 'right'))
+        assert np.allclose(np.searchsorted(a, b, side='right'), f(a, b))
+
+    def test_infer_shape(self):
+        x = T.vector('x')
+        v = T.tensor3('v')
+
+        a = np.random.random(100).astype(config.floatX)
+        b = np.random.random((10,20,5)).astype(config.floatX)
+        idx_sorted = np.argsort(a)
+
+        # Test using default parameters' value
+        self._compile_and_check([x, v],
+                                [searchsorted(x, v)],
+                                [a[idx_sorted], b],
+                                self.op_class)
+
+        # Test parameter ``sorter``
+        sorter = T.vector('sorter', dtype="int64")
+        self._compile_and_check([x, v, sorter],
+                                [searchsorted(x, v, sorter=sorter)],
+                                [a, b, idx_sorted],
+                                self.op_class)
+
+        # Test parameter ``side``
+        a = np.ones(10).astype(config.floatX)
+        b = np.ones(shape=(1,2,3)).astype(config.floatX)
+        self._compile_and_check([x, v],
+                                [searchsorted(x, v, side='right')],
+                                [a, b],
+                                self.op_class)
+
+    def test_grad(self):
+        a = np.random.random(100).astype(config.floatX)
+        b = np.random.random((1,2,5)).astype(config.floatX)
+        idx_sorted = np.argsort(a)
+
+        self.assertRaises(theano.gradient.NullTypeGradError, utt.verify_grad, self.op, [a[idx_sorted], b])
 
 class TestCumsumOp(utt.InferShapeTester):
 
