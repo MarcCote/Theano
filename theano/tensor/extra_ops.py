@@ -37,7 +37,7 @@ class SearchsortedOp(theano.Op):
         v = inputs[1]
         sorter = inputs[2]
         z = output_storage[0]
-        z[0] = np.searchsorted(x, v, side=self.side, sorter=sorter)
+        z[0] = np.array(np.searchsorted(x, v, side=self.side, sorter=sorter))
 
     def grad(self, inputs, output_gradients):
         #No grad defined for intergers.
