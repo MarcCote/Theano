@@ -27,17 +27,10 @@ class SearchsortedOp(theano.Op):
     def make_node(self, x, v, sorter=None):
         x = basic.as_tensor_variable(x)
         v = basic.as_tensor_variable(v)
-        sorter_var = theano.tensor.NoneConst
-
-        if sorter is not None:
-            if sorter.dtype not in SearchsortedOp.sorter_type:
-                raise TypeError("SearchsortedOp: The dtype of parameter 'sorter' must be an integer.")
-
-            sorter_var = basic.as_tensor_variable(sorter)
-
+        sorter = theano.tensor.as_index_variable(sorter)
         out_type = theano.tensor.tensor(dtype="int64", broadcastable=v.broadcastable)
 
-        return theano.Apply(self, [x, v, sorter_var], [out_type])
+        return theano.Apply(self, [x, v, sorter], [out_type])
 
     def perform(self, node, inputs, output_storage):
         x = inputs[0]
