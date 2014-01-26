@@ -18,8 +18,7 @@ class SearchsortedOp(theano.Op):
         self.side = side
 
     def __eq__(self, other):
-        return (type(self) == type(other) and
-                self.side == other.side)
+        return (type(self) == type(other) and self.side == other.side)
 
     def __hash__(self):
         return hash(type(self)) ^ hash(self.side)
@@ -27,7 +26,15 @@ class SearchsortedOp(theano.Op):
     def make_node(self, x, v, sorter=None):
         x = basic.as_tensor_variable(x)
         v = basic.as_tensor_variable(v)
-        sorter = theano.tensor.as_index_variable(sorter)
+
+        if sorter is None:
+            sorter = theano.tensor.as_tensor_variable(0)
+        else:
+            sorter = theano.tensor.as_index_variable(sorter)
+            assert sorter.ndim == 1
+        
+        assert x.ndim == 1
+
         out_type = theano.tensor.tensor(dtype="int64", broadcastable=v.broadcastable)
 
         return theano.Apply(self, [x, v, sorter], [out_type])
@@ -35,7 +42,7 @@ class SearchsortedOp(theano.Op):
     def perform(self, node, inputs, output_storage):
         x = inputs[0]
         v = inputs[1]
-        sorter = inputs[2]
+        sorter = inputs[2] if inputs[2].shape != () else None
         z = output_storage[0]
         z[0] = np.array(np.searchsorted(x, v, side=self.side, sorter=sorter))
 
@@ -59,6 +66,32 @@ class SearchsortedOp(theano.Op):
 
     def infer_shape(self, node, shapes):
         return [shapes[1]]
+
+    def c_code(self, node, name, inames, onames, sub):
+        x, v, sorter = inames
+        z, = onames
+        side = "NPY_SEARCHRIGHT" if self.side == 'right' else "NPY_SEARCHLEFT"
+        fail = sub['fail']
+
+        return """
+            PyObject* sorter = NULL;
+            if(PyArray_NDIM(%(sorter)s) > 0)
+            {
+                //printf("sorter: %%d\\n", PyArray_NDIM(%(sorter)s));
+                sorter = (PyObject*)%(sorter)s;
+            }
+
+            Py_XDECREF(%(z)s);
+            %(z)s = (PyArrayObject*) PyArray_SearchSorted(%(x)s, (PyObject*)%(v)s, %(side)s, sorter);
+            //printf("z: %%d\\n", ((dtype_%(z)s *)PyArray_DATA(%(z)s))[0]);
+            
+            if (!%(z)s)
+                %(fail)s;
+
+        """ % locals()
+
+    def c_code_cache_version(self):
+        return (1,)
 
     def __str__(self):
         return self.__class__.__name__

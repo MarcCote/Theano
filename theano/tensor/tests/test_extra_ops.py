@@ -36,22 +36,33 @@ class TestSearchsortedOp(utt.InferShapeTester):
         b = np.random.random((10,20,5)).astype(config.floatX)
         idx_sorted = np.argsort(a)
 
+        # # Test is c_code is really used.
+        # f = theano.function([x, v], searchsorted(x, v), mode="FAST_RUN")
+        # assert np.allclose(np.searchsorted(a[idx_sorted], b), f(a[idx_sorted], b))
+
+        # f = theano.function([x, v], searchsorted(x, v), mode=theano.compile.Mode(linker="c", optimizer='fast_run'))
+        # assert np.allclose(np.searchsorted(a[idx_sorted], b), f(a[idx_sorted], b))
+
         # Test using default parameters' value
-        f = theano.function([x, v], searchsorted(x, v))
+        f = theano.function([x, v], searchsorted(x, v), mode="DebugMode")
         assert np.allclose(np.searchsorted(a[idx_sorted], b), f(a[idx_sorted], b))
+
+        sorter = T.vector('sorter', dtype="int64")
+        f = theano.function([x, v, sorter], searchsorted(x, v, sorter=sorter))
+        self.assertRaises(ValueError, f, a[idx_sorted], b, None)
 
         # Test parameter ``sorter``
         sorter = T.vector('sorter', dtype="float32")  # Non-integer should raise exception on compilation.
         self.assertRaises(TypeError, searchsorted, x, v, sorter=sorter)
 
         sorter = T.vector('sorter', dtype="int64")
-        f = theano.function([x, v, sorter], searchsorted(x, v, sorter=sorter))
+        f = theano.function([x, v, sorter], searchsorted(x, v, sorter=sorter), mode="DebugMode")
         assert np.allclose(np.searchsorted(a, b, sorter=idx_sorted), f(a, b, idx_sorted))
 
         # Test parameter ``side``
         a = np.ones(10).astype(config.floatX)
         b = np.ones(shape=(1,2,3)).astype(config.floatX)
-        f = theano.function([x, v], searchsorted(x, v, 'right'))
+        f = theano.function([x, v], searchsorted(x, v, 'right'), mode="DebugMode")
         assert np.allclose(np.searchsorted(a, b, side='right'), f(a, b))
 
     def test_infer_shape(self):
