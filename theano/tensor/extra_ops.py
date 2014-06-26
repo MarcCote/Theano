@@ -10,6 +10,118 @@ tensor = basic
 from theano.gradient import DisconnectedType
 
 
+class SearchsortedOp(theano.Op):
+    # See function searchsorted for docstring
+    sorter_type = ('int8', 'int16', 'int32', 'int64',
+                   'uint8', 'uint16', 'uint32', 'uint64')
+    """Tuple of all compatible dtype for parameter ``sorter`` of this op."""
+
+    def __init__(self, side='left'):
+        self.side = side
+
+    def __eq__(self, other):
+        return (type(self) == type(other) and self.side == other.side)
+
+    def __hash__(self):
+        return hash(type(self)) ^ hash(self.side)
+
+    def make_node(self, x, v, sorter=None):
+        x = basic.as_tensor_variable(x)
+        v = basic.as_tensor_variable(v)
+
+        if sorter is None:
+            sorter = theano.tensor.as_tensor_variable(0)
+        else:
+            sorter = theano.tensor.as_index_variable(sorter)
+            assert sorter.ndim == 1
+
+        assert x.ndim == 1
+
+        out_type = theano.tensor.tensor(dtype="int64", broadcastable=v.broadcastable)
+
+        return theano.Apply(self, [x, v, sorter], [out_type])
+
+    def perform(self, node, inputs, output_storage):
+        x = inputs[0]
+        v = inputs[1]
+        sorter = inputs[2] if inputs[2].shape != () else None
+        z = output_storage[0]
+        z[0] = np.array(np.searchsorted(x, v, side=self.side, sorter=sorter))
+
+    def grad(self, inputs, output_gradients):
+        #No grad defined for intergers.
+        x, nb, sorter = inputs
+
+        x_grad = theano.gradient.grad_not_implemented(
+            self, 0, x,
+            "I'm not sure how to implement the gradient of searchargsort."
+            " So I mark it as not implemented for now.")
+        nb_grad = theano.gradient.grad_not_implemented(
+            self, 1, nb,
+            "I'm not sure how to implement the gradient of searchargsort."
+            " So I mark it as not implemented for now.")
+        sorter_grad = theano.gradient.grad_undefined(
+            self, 2, sorter,
+            "searchsorted is not defined for non-integer sorter so"
+            " searchsorted(x, nb, sorter+eps) is undefined")
+        return [x_grad, nb_grad, sorter_grad]
+
+    def infer_shape(self, node, shapes):
+        return [shapes[1]]
+
+    def c_code(self, node, name, inames, onames, sub):
+        x, v, sorter = inames
+        z, = onames
+        side = "NPY_SEARCHRIGHT" if self.side == 'right' else "NPY_SEARCHLEFT"
+        fail = sub['fail']
+
+        return """
+            PyObject* sorter = NULL;
+            if(PyArray_NDIM(%(sorter)s) > 0)
+            {
+                //printf("sorter: %%d\\n", PyArray_NDIM(%(sorter)s));
+                sorter = (PyObject*)%(sorter)s;
+            }
+
+            Py_XDECREF(%(z)s);
+            %(z)s = (PyArrayObject*) PyArray_SearchSorted(%(x)s, (PyObject*)%(v)s, %(side)s, sorter);
+            //printf("z: %%d\\n", ((dtype_%(z)s *)PyArray_DATA(%(z)s))[0]);
+
+            if (!%(z)s)
+                %(fail)s;
+
+        """ % locals()
+
+    def c_code_cache_version(self):
+        return (1,)
+
+    def __str__(self):
+        return self.__class__.__name__
+
+
+def searchsorted(x, v, side='left', sorter=None):
+    """Find indices where elements should be inserted to maintain order.
+
+    Wraping of numpy.searchsorted. Find the indices into a sorted array
+    ``x`` such that, if the corresponding elements in ``v`` were inserted
+    before the indices, the order of ``x`` would be preserved.
+
+    :param x: Input vector variable (1-D tensor).
+
+    :param v: Tensor variable containing the values to insert into ``x``.
+
+    :param side: {'left', 'right'}. If 'left', the index of the first suitable
+        location found is given. If 'right', return the last such index. If
+        there is no suitable index, return either 0 or N (where N is the length
+        of ``x``).
+
+    :param sorter: vector of integers (1-D tensor) containing indices that sort
+        array a into ascending order. They are typically the result of argsort.
+
+    .. versionadded:: 0.6.1
+    """
+    return SearchsortedOp(side=side)(x, v, sorter)
+
 
 class CumsumOp(theano.Op):
     # See function cumsum for docstring
@@ -780,15 +892,15 @@ class FillDiagonalOffset(gof.Op):
         """
         Note: The fill_diagonal only support rectangular matrix. The output
         of tall matrix is "wrapped", which is an option in numpy 1.9.0
-        but was regarded as a bug in numpy 1.6.2. Here I implement the 
+        but was regarded as a bug in numpy 1.6.2. Here I implement the
         fill_diagonal_offset with unwrapped output, so fill_diagonal_offset
         supports tall matrix.(This make a little difference between the output
-        of fill_diagonal and fill_diagonal_offset only in the case of tall 
+        of fill_diagonal and fill_diagonal_offset only in the case of tall
         matrix)
         """
         if offset >= 0:
             start = offset
-            num_of_step = min( min(width,height), width - offset) 
+            num_of_step = min( min(width,height), width - offset)
         else:
             start = - offset * a.shape[1]
             num_of_step = min( min(width,height), height + offset)
@@ -812,10 +924,10 @@ class FillDiagonalOffset(gof.Op):
         if (a.dtype.startswith('complex')):
             return [None, None]
 
-        # only valid for matrices        
-        wr_a = fill_diagonal_offset(grad, 0, offset)  
-        
-        offset_abs = basic.abs_( offset ) 
+        # only valid for matrices
+        wr_a = fill_diagonal_offset(grad, 0, offset)
+
+        offset_abs = basic.abs_( offset )
         pos_offset_flag = basic.ge( offset, 0 )
         neg_offset_flag = basic.lt( offset, 0 )
         min_wh = basic.minimum(width,height)
@@ -823,8 +935,8 @@ class FillDiagonalOffset(gof.Op):
         start = offset * pos_offset_flag + offset_abs * width \
                  * neg_offset_flag
         num_of_step = basic.minimum( min_wh, width * pos_offset_flag
-                    + height * neg_offset_flag - offset_abs )   
-       
+                    + height * neg_offset_flag - offset_abs )
+
         step = a.shape[1] + 1
         end = start + step * num_of_step
 
@@ -850,7 +962,7 @@ fill_diagonal_offset = FillDiagonalOffset()
     :param val: Scalar value to fill the diagonal whose type must be
         compatible with that of array 'a' (i.e. 'val' cannot be viewed
         as an upcast of 'a').
-    :params offset : Scalar value Offset of the diagonal from the main 
+    :params offset : Scalar value Offset of the diagonal from the main
         diagonal. Can be positive or negative integer.
     :return: An array identical to 'a' except that its offset diagonal
         is filled with scalar 'val'. The output is unwrapped.
