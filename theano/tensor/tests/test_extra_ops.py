@@ -1,6 +1,5 @@
 import numpy as np
 import numpy
-import unittest
 
 import theano
 from theano.tests import unittest_tools as utt
@@ -21,6 +20,7 @@ from theano import config, tensor, function
 numpy_ver = [int(n) for n in numpy.__version__.split('.')[:2]]
 numpy_16 = bool(numpy_ver >= [1, 6])
 
+
 class TestSearchsortedOp(utt.InferShapeTester):
 
     def setUp(self):
@@ -33,7 +33,7 @@ class TestSearchsortedOp(utt.InferShapeTester):
         v = T.tensor3('v')
 
         a = np.random.random(100).astype(config.floatX)
-        b = np.random.random((10,20,5)).astype(config.floatX)
+        b = np.random.random((10, 20, 5)).astype(config.floatX)
         idx_sorted = np.argsort(a)
 
         # # Test is c_code is really used.
@@ -61,7 +61,7 @@ class TestSearchsortedOp(utt.InferShapeTester):
 
         # Test parameter ``side``
         a = np.ones(10).astype(config.floatX)
-        b = np.ones(shape=(1,2,3)).astype(config.floatX)
+        b = np.ones(shape=(1, 2, 3)).astype(config.floatX)
         f = theano.function([x, v], searchsorted(x, v, 'right'), mode="DebugMode")
         assert np.allclose(np.searchsorted(a, b, side='right'), f(a, b))
 
@@ -70,7 +70,7 @@ class TestSearchsortedOp(utt.InferShapeTester):
         v = T.tensor3('v')
 
         a = np.random.random(100).astype(config.floatX)
-        b = np.random.random((10,20,5)).astype(config.floatX)
+        b = np.random.random((10, 20, 5)).astype(config.floatX)
         idx_sorted = np.argsort(a)
 
         # Test using default parameters' value
@@ -88,7 +88,7 @@ class TestSearchsortedOp(utt.InferShapeTester):
 
         # Test parameter ``side``
         a = np.ones(10).astype(config.floatX)
-        b = np.ones(shape=(1,2,3)).astype(config.floatX)
+        b = np.ones(shape=(1, 2, 3)).astype(config.floatX)
         self._compile_and_check([x, v],
                                 [searchsorted(x, v, side='right')],
                                 [a, b],
@@ -96,10 +96,11 @@ class TestSearchsortedOp(utt.InferShapeTester):
 
     def test_grad(self):
         a = np.random.random(100).astype(config.floatX)
-        b = np.random.random((1,2,5)).astype(config.floatX)
+        b = np.random.random((1, 2, 5)).astype(config.floatX)
         idx_sorted = np.argsort(a)
 
         self.assertRaises(theano.gradient.NullTypeGradError, utt.verify_grad, self.op, [a[idx_sorted], b])
+
 
 class TestCumsumOp(utt.InferShapeTester):
 
@@ -118,7 +119,6 @@ class TestCumsumOp(utt.InferShapeTester):
         for axis in range(len(a.shape)):
             f = theano.function([x], cumsum(x, axis=axis))
             assert np.allclose(np.cumsum(a, axis=axis), f(a))
-
 
     def test_infer_shape(self):
         x = T.tensor3('x')
@@ -573,10 +573,10 @@ class TestFillDiagonalOffset(utt.InferShapeTester):
                 # We can't use numpy.fill_diagonal as it is bugged.
                 assert numpy.allclose(numpy.diag(out, test_offset), val)
                 if test_offset >= 0:
-                   assert (out == val).sum() == min( min(a.shape), 
+                   assert (out == val).sum() == min( min(a.shape),
                                             a.shape[1]-test_offset )
                 else:
-                    assert (out == val).sum() == min( min(a.shape), 
+                    assert (out == val).sum() == min( min(a.shape),
                                             a.shape[0]+test_offset )
 
     def test_gradient(self):
@@ -585,13 +585,13 @@ class TestFillDiagonalOffset(utt.InferShapeTester):
             def fill_diagonal_with_fix_offset( a, val):
                 return fill_diagonal_offset( a, val, test_offset)
 
-            utt.verify_grad(fill_diagonal_with_fix_offset, 
+            utt.verify_grad(fill_diagonal_with_fix_offset,
                         [numpy.random.rand(5, 8), numpy.random.rand()],
                             n_tests=1, rng=TestFillDiagonalOffset.rng)
-            utt.verify_grad(fill_diagonal_with_fix_offset, 
+            utt.verify_grad(fill_diagonal_with_fix_offset,
                         [numpy.random.rand(8, 5), numpy.random.rand()],
                             n_tests=1, rng=TestFillDiagonalOffset.rng)
-            utt.verify_grad(fill_diagonal_with_fix_offset, 
+            utt.verify_grad(fill_diagonal_with_fix_offset,
                         [numpy.random.rand(5, 5), numpy.random.rand()],
                             n_tests=1, rng=TestFillDiagonalOffset.rng)
 

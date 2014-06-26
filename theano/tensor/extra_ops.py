@@ -32,7 +32,7 @@ class SearchsortedOp(theano.Op):
         else:
             sorter = theano.tensor.as_index_variable(sorter)
             assert sorter.ndim == 1
-        
+
         assert x.ndim == 1
 
         out_type = theano.tensor.tensor(dtype="int64", broadcastable=v.broadcastable)
@@ -84,7 +84,7 @@ class SearchsortedOp(theano.Op):
             Py_XDECREF(%(z)s);
             %(z)s = (PyArrayObject*) PyArray_SearchSorted(%(x)s, (PyObject*)%(v)s, %(side)s, sorter);
             //printf("z: %%d\\n", ((dtype_%(z)s *)PyArray_DATA(%(z)s))[0]);
-            
+
             if (!%(z)s)
                 %(fail)s;
 
@@ -100,7 +100,7 @@ class SearchsortedOp(theano.Op):
 def searchsorted(x, v, side='left', sorter=None):
     """Find indices where elements should be inserted to maintain order.
 
-    Wraping of numpy.searchsorted. Find the indices into a sorted array 
+    Wraping of numpy.searchsorted. Find the indices into a sorted array
     ``x`` such that, if the corresponding elements in ``v`` were inserted
     before the indices, the order of ``x`` would be preserved.
 
@@ -108,8 +108,8 @@ def searchsorted(x, v, side='left', sorter=None):
 
     :param v: Tensor variable containing the values to insert into ``x``.
 
-    :param side: {'left', 'right'}. If 'left', the index of the first suitable 
-        location found is given. If 'right', return the last such index. If 
+    :param side: {'left', 'right'}. If 'left', the index of the first suitable
+        location found is given. If 'right', return the last such index. If
         there is no suitable index, return either 0 or N (where N is the length
         of ``x``).
 
@@ -154,8 +154,8 @@ class CumsumOp(theano.Op):
 
         # We need to reverse the gradients along ``self.axis``,
         #  compute cumsum, then reverse again
-        reverse_slicing = [slice(None,None,None)] * gi.ndim
-        reverse_slicing[self.axis] = slice(None,None,-1)
+        reverse_slicing = [slice(None, None, None)] * gi.ndim
+        reverse_slicing[self.axis] = slice(None, None, -1)
         reverse_slicing = tuple(reverse_slicing)
         return [cumsum(gi[reverse_slicing], self.axis)[reverse_slicing]]
 
@@ -206,7 +206,7 @@ class CumsumOp(theano.Op):
         return code
 
     def c_code_cache_version(self):
-        return (1,)
+        return (3,)
 
     def __str__(self):
         return "%s{%s}" % (self.__class__.__name__, self.axis)
